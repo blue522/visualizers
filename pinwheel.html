@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            max-width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            gap: 1.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+            background: linear-gradient(90deg, #ff7e5f, #feb47b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-button {
+            border: 2px solid #feb47b;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 700;
+            color: #feb47b;
+            font-size: 0.9rem;
+            background-color: transparent;
+        }
+        
+        /* New class for visual feedback when a file is loaded */
+        .file-button.loaded {
+            background-color: #38b48b; /* A nice green color */
+            border-color: #38b48b;
+            color: #1a1a1a;
+        }
+        .file-button.loaded:hover {
+            background-color: #2e9671;
+            border-color: #2e9671;
+        }
+
+        .file-button:hover:not(:disabled) {
+            background-color: #feb47b;
+            color: #1a1a1a;
+        }
+        
+        .start-button {
+            background: linear-gradient(90deg, #ff7e5f, #feb47b);
+            color: #1a1a1a;
+            font-weight: 700;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 5px 15px rgba(254, 180, 123, 0.4);
+        }
+        
+        .start-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(254, 180, 123, 0.6);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+            box-shadow: none;
+        }
+
+        #status-message {
+            margin-top: 1rem;
+            min-height: 1.5rem;
+            color: #ff7e5f;
+            font-style: italic;
+        }
+        
+        #visualizer-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        .select-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        select {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            border: 2px solid #feb47b;
+            background-color: transparent;
+            color: #feb47b;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23feb47b" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1.5rem;
+            font-size: 0.9rem;
+            text-align: center; /* This centers the text */
+            text-align-last: center; /* This ensures the selected option is also centered */
+        }
+
+        select option {
+            background: #1a1a1a;
+            color: #feb47b;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="visualizer-canvas"></canvas>
+
+    <div id="ui-container" class="container">
+        <h1>Music Kaleidoscope</h1>
+        <p class="text-gray-400">Choose images and/or an MP3 file to begin. Any missing media will be provided for you.</p>
+        
+        <div class="flex flex-col md:flex-row gap-4 w-full justify-center items-center">
+            <label for="image-input" class="file-button" id="image-button-label">
+                Choose Images
+            </label>
+            <input type="file" id="image-input" multiple accept="image/*">
+            
+            <label for="audio-input" class="file-button" id="audio-button-label">
+                Choose MP3
+            </label>
+            <input type="file" id="audio-input" accept="audio/mp3">
+        </div>
+        
+        <!-- Dropdown for quadrant selection -->
+        <div class="select-container">
+            <label for="quadrant-select" class="text-sm font-bold text-gray-300">Choose Quadrant Count</label>
+            <select id="quadrant-select">
+                <option value="1">1</option>
+                <option value="4">4</option>
+                <option value="9" selected>9</option>
+                <option value="16">16</option>
+                <option value="25">25</option>
+            </select>
+        </div>
+        
+        <button id="start-button" class="start-button">Start Visualization</button>
+        <p id="status-message" class="text-sm"></p>
+    </div>
+
+    <script>
+        // --- Global State & DOM Elements ---
+        const canvas = document.getElementById('visualizer-canvas');
+        const context = canvas.getContext('2d');
+        const imageInput = document.getElementById('image-input');
+        const audioInput = document.getElementById('audio-input');
+        const startButton = document.getElementById('start-button');
+        const uiContainer = document.getElementById('ui-container');
+        const statusMessage = document.getElementById('status-message');
+        const imageButtonLabel = document.getElementById('image-button-label');
+        const audioButtonLabel = document.getElementById('audio-button-label');
+        // Quadrant selection DOM element
+        const quadrantSelect = document.getElementById('quadrant-select');
+
+        let audioContext;
+        let audioElement;
+        let analyserNode;
+        let audioDataArray;
+        let images = [];
+        // `numSlices` is no longer a fixed number. It will be updated dynamically in the animation loop.
+        let numSlices;
+        let rotation = 0;
+        let currentImageIndex = 0;
+        let nextImageIndex = 0;
+        let lastImageSwapTime = 0;
+        const IMAGE_CHANGE_INTERVAL = 5000; // Change image every 5 seconds
+        const IMAGE_FADE_DURATION = 3000; // Fade takes 3 seconds
+        let isPaused = false;
+        let animationFrameId = null;
+
+        let imageReady = false;
+        let audioReady = false;
+        let numQuadrants = parseInt(quadrantSelect.value); // Get initial value from dropdown
+
+        // --- Fallback URLs ---
+        const defaultImageUrls = [
+            'https://placehold.co/800x600/FF5733/FFFFFF?text=Image+1',
+            'https://placehold.co/800x600/33FF57/000000?text=Image+2',
+            'https://placehold.co/800x600/3357FF/FFFFFF?text=Image+3',
+            'https://placehold.co/800x600/F0F0F0/111111?text=Image+4'
+        ];
+        const defaultAudioUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+
+        // --- Event Listeners ---
+
+        // Handle image file selection
+        imageInput.addEventListener('change', async (event) => {
+            await loadFiles(event.target.files);
+        });
+
+        // Handle audio file selection
+        audioInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                await loadAudioFromUrl(url);
+            }
+        });
+        
+        // Start visualization when button is clicked
+        startButton.addEventListener('click', async () => {
+            // Check for missing media and load defaults if necessary
+            if (!imageReady) {
+                statusMessage.textContent = 'No images selected. Loading default images...';
+                await loadImagesFromUrls(defaultImageUrls);
+            }
+            if (!audioReady) {
+                statusMessage.textContent = 'No music selected. Loading default music...';
+                await loadAudioFromUrl(defaultAudioUrl);
+            }
+
+            // Start only if both are now ready
+            if (imageReady && audioReady) {
+                uiContainer.classList.add('hidden');
+                isPaused = false;
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                audioElement.play();
+                lastImageSwapTime = performance.now(); // Start the timer for the first image swap
+                animate();
+            } else {
+                 statusMessage.textContent = 'Failed to load all required media. Please try again.';
+            }
+        });
+        
+        // Event listener for the new quadrant select dropdown
+        quadrantSelect.addEventListener('change', (event) => {
+            numQuadrants = parseInt(event.target.value);
+        });
+
+        // Event listener for spacebar to pause/unpause
+        window.addEventListener('keydown', (event) => {
+            if (event.key === ' ' && audioElement) {
+                event.preventDefault(); // Prevents page from scrolling
+                if (isPaused) {
+                    resumeVisualization();
+                } else {
+                    pauseVisualization();
+                }
+            }
+        });
+        
+        // Pause function
+        function pauseVisualization() {
+            if (!isPaused) {
+                isPaused = true;
+                audioElement.pause();
+                if (audioContext.state !== 'suspended') {
+                    audioContext.suspend();
+                }
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+        }
+
+        // Resume function
+        function resumeVisualization() {
+            if (isPaused) {
+                isPaused = false;
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                audioElement.play();
+                animate();
+            }
+        }
+
+        // --- Helper Functions to Load Files ---
+        async function loadFiles(files) {
+            statusMessage.textContent = 'Loading images...';
+            imageButtonLabel.classList.remove('loaded');
+            if (files.length > 10) {
+                statusMessage.textContent = 'Please select no more than 10 images.';
+                imageReady = false;
+                return;
+            }
+            images = [];
+            const promises = [];
+
+            for (const file of files) {
+                promises.push(new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            images.push(img);
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            console.error('Failed to load image:', file.name);
+                            reject();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }));
+            }
+            
+            try {
+                await Promise.allSettled(promises);
+                imageReady = images.length > 0;
+                statusMessage.textContent = imageReady ? 'Images loaded.' : 'No images selected.';
+                if (imageReady) {
+                    imageButtonLabel.classList.add('loaded');
+                }
+            } catch (e) {
+                imageReady = false;
+                statusMessage.textContent = 'Error loading images.';
+                console.error(e);
+            }
+        }
+
+        async function loadImagesFromUrls(urls) {
+            images = [];
+            const promises = urls.map(url => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                        images.push(img);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.error('Failed to load default image from URL:', url);
+                        reject();
+                    };
+                    img.src = url;
+                });
+            });
+
+            try {
+                await Promise.allSettled(promises);
+                imageReady = images.length > 0;
+            } catch (e) {
+                imageReady = false;
+                console.error('Error loading default images.', e);
+            }
+        }
+
+        async function loadAudioFromUrl(url) {
+            try {
+                audioElement = new Audio();
+                audioElement.crossOrigin = "anonymous";
+                audioElement.src = url;
+
+                const audioPromise = new Promise((resolve, reject) => {
+                    audioElement.onloadedmetadata = resolve;
+                    audioElement.onerror = reject;
+                });
+                await audioPromise;
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaElementSource(audioElement);
+                analyserNode = audioContext.createAnalyser();
+                source.connect(analyserNode);
+                analyserNode.connect(audioContext.destination);
+                analyserNode.fftSize = 2048;
+                audioDataArray = new Uint8Array(analyserNode.frequencyBinCount);
+                
+                audioReady = true;
+                audioButtonLabel.classList.add('loaded');
+            } catch (error) {
+                console.error('Error loading audio:', error);
+                audioReady = false;
+                audioButtonLabel.classList.remove('loaded');
+            }
+        }
+
+        // --- Core Animation Loop ---
+        function animate(currentTime) {
+            if (isPaused) return;
+
+            animationFrameId = requestAnimationFrame(animate);
+
+            if (!analyserNode) {
+                console.error("Analyser not ready.");
+                return;
+            }
+            
+            analyserNode.getByteFrequencyData(audioDataArray);
+            
+            // Image cross-fade logic
+            if (currentTime - lastImageSwapTime > IMAGE_CHANGE_INTERVAL) {
+                lastImageSwapTime = currentTime;
+                currentImageIndex = (currentImageIndex + 1) % images.length;
+                nextImageIndex = (currentImageIndex + 1) % images.length;
+            }
+            
+            let fadeProgress = Math.min(1, (currentTime - lastImageSwapTime) / IMAGE_FADE_DURATION);
+            
+            // Calculate overall amplitude for numSlices and audioAlpha
+            let amplitude = 0;
+            const bufferSize = audioDataArray.length;
+            for (let i = 0; i < bufferSize; i++) {
+                amplitude += audioDataArray[i];
+            }
+            amplitude = amplitude / bufferSize;
+            
+            // Overall visualizer alpha based on audio amplitude
+            const audioAlpha = amplitude > 10 ? 1 : 0;
+
+            // --- Dynamic `numSlices` logic ---
+            // Map the amplitude (0-255) to a number of slices between 4 and 16.
+            const minSlices = 4;
+            const maxSlices = 16;
+            numSlices = Math.floor((amplitude / 255) * (maxSlices - minSlices) + minSlices);
+            
+            // --- New logic for zoom level using Spectral Centroid ---
+            let weightedSum = 0;
+            let totalSum = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                weightedSum += i * audioDataArray[i];
+                totalSum += audioDataArray[i];
+            }
+            let spectralCentroid = totalSum > 0 ? weightedSum / totalSum : 0;
+            // Map the spectral centroid (0 to bufferSize) to a zoom level (e.g., 1.0 to 5.0)
+            const zoomLevel = 1.0 + (spectralCentroid / bufferSize) * 4.0;
+            
+            // Clear the canvas
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate music-based effects
+            let bass = 0;
+            const bassBins = Math.min(50, audioDataArray.length);
+            for (let i = 0; i < bassBins; i++) {
+                bass += audioDataArray[i];
+            }
+            bass = bass / bassBins;
+            
+            const brightness = 0.7 + (bass / 255) * 0.3;
+
+            let mids = 0;
+            const midStart = bassBins;
+            const midEnd = Math.min(400, audioDataArray.length);
+            for (let i = midStart; i < midEnd; i++) {
+                mids += audioDataArray[i];
+            }
+            mids = mids / (midEnd - midStart);
+            
+            const rotationSpeed = (mids / 255) * 0.04 - 0.02; 
+            rotation += rotationSpeed;
+            
+            let treble = 0;
+            const trebleStart = midEnd;
+            const trebleEnd = Math.min(800, audioDataArray.length);
+            for (let i = trebleStart; i < trebleEnd; i++) {
+                treble += audioDataArray[i];
+            }
+            treble = treble / (trebleEnd - trebleStart);
+            const anchorOffset = (treble / 255) * 0.5 - 0.25;
+
+            // Draw the current image, fading out
+            if (images.length > 0) {
+                drawVisuals(images[currentImageIndex], audioAlpha * (1 - fadeProgress), zoomLevel, brightness, anchorOffset);
+            }
+
+            // Draw the next image, fading in
+            if (images.length > 1) {
+                drawVisuals(images[nextImageIndex], audioAlpha * fadeProgress, zoomLevel, brightness, anchorOffset);
+            }
+        }
+
+        // Draws all the quadrants for a given image and alpha
+        function drawVisuals(img, alpha, zoomLevel, brightness, anchorOffset) {
+            context.globalAlpha = alpha;
+            context.filter = `brightness(${brightness}) hue-rotate(${(rotation * 50) % 360}deg)`;
+            
+            const gridSize = Math.sqrt(numQuadrants);
+            for (let i = 0; i < numQuadrants; i++) {
+                const row = Math.floor(i / gridSize);
+                const col = i % gridSize;
+                
+                const quadrantWidth = canvas.width / gridSize;
+                const quadrantHeight = canvas.height / gridSize;
+                const quadrantX = quadrantWidth * col;
+                const quadrantY = quadrantHeight * row;
+                const quadrantCenterX = quadrantX + quadrantWidth / 2;
+                const quadrantCenterY = quadrantY + quadrantHeight / 2;
+
+                drawSingleVisualizer(quadrantCenterX, quadrantCenterY, quadrantWidth, quadrantHeight, zoomLevel, img, quadrantX, quadrantY, anchorOffset);
+            }
+        }
+
+        // --- Drawing Logic for a single Kaleidoscope instance ---
+        function drawSingleVisualizer(centerX, centerY, width, height, zoomLevel, img, clipX, clipY, anchorOffset) {
+            // Create a clipping path for the quadrant
+            context.save();
+            context.beginPath();
+            context.rect(clipX, clipY, width, height);
+            context.clip();
+
+            if (!img || img.naturalWidth === 0) return;
+
+            const sideLength = Math.max(width, height) * 1.5;
+            const halfSliceAngle = (Math.PI * 2) / numSlices / 2;
+            const drawX = -sideLength / 2;
+            
+            // Use anchorOffset to shift the pinwheel's origin
+            const drawY = -sideLength / 2 + (sideLength * anchorOffset);
+
+            for (let i = 0; i < numSlices; i++) {
+                context.save();
+                
+                context.translate(centerX, centerY);
+                context.rotate(i * 2 * halfSliceAngle + rotation);
+                context.scale(zoomLevel, zoomLevel);
+
+                context.beginPath();
+                context.moveTo(0, 0);
+                context.lineTo(sideLength, 0);
+                context.lineTo(sideLength * Math.cos(2 * halfSliceAngle), sideLength * Math.sin(2 * halfSliceAngle));
+                context.closePath();
+                context.clip();
+
+                context.save();
+                context.beginPath();
+                context.moveTo(0, 0);
+                context.lineTo(sideLength, 0);
+                context.lineTo(sideLength * Math.cos(2 * halfSliceAngle), sideLength * Math.sin(2 * halfSliceAngle));
+                context.closePath();
+                context.clip();
+
+                context.drawImage(img, drawX, drawY, sideLength, sideLength);
+                context.scale(-1, 1);
+                context.drawImage(img, drawX, drawY, sideLength, sideLength);
+                
+                context.restore();
+                context.restore();
+            }
+            context.restore(); // Restore the quadrant clipping path
+        }
+        
+        // --- Setup Functions ---
+        window.onload = function() {
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            statusMessage.textContent = 'Ready to visualize! Click Start or load your own media. Press space to pause/play.';
+        };
+    </script>
+</body>
+</html>
