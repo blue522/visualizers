@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flying Geese Quilt</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="quiltCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('quiltCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // A color palette for the quilt blocks
+        const colors = ['#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'];
+        const transitionDuration = 4000; // 4 seconds for a full color cycle
+
+        function hexToRgb(hex) {
+            let r = 0, g = 0, b = 0;
+            if (hex.length == 4) { // 3 digits
+                r = parseInt(hex[1] + hex[1], 16);
+                g = parseInt(hex[2] + hex[2], 16);
+                b = parseInt(hex[3] + hex[3], 16);
+            } else if (hex.length == 7) { // 6 digits
+                r = parseInt(hex.substring(1, 3), 16);
+                g = parseInt(hex.substring(3, 5), 16);
+                b = parseInt(hex.substring(5, 7), 16);
+            }
+            return { r, g, b };
+        }
+
+        function rgbToHex(r, g, b) {
+            const toHex = c => ('0' + Math.round(c).toString(16)).slice(-2);
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        function lerpColor(hex1, hex2, t) {
+            const rgb1 = hexToRgb(hex1);
+            const rgb2 = hexToRgb(hex2);
+
+            const r = rgb1.r * (1 - t) + rgb2.r * t;
+            const g = rgb1.g * (1 - t) + rgb2.g * t;
+            const b = rgb1.b * (1 - t) + rgb2.b * t;
+
+            return rgbToHex(r, g, b);
+        }
+
+        /**
+         * Draws a single "Flying Geese" block.
+         */
+        function drawFlyingGeeseUnit(x, y, width, height, gooseColor, skyColor, orientation) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            let w = width;
+            let h = height;
+
+            switch (orientation) {
+                case 'up': break;
+                case 'right':
+                    ctx.rotate(Math.PI / 2);
+                    ctx.translate(0, -width);
+                    [w, h] = [height, width];
+                    break;
+                case 'down':
+                    ctx.rotate(Math.PI);
+                    ctx.translate(-width, -height);
+                    break;
+                case 'left':
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.translate(-height, 0);
+                    [w, h] = [height, width];
+                    break;
+            }
+
+            ctx.fillStyle = skyColor;
+            ctx.beginPath();
+            ctx.moveTo(0, 0); ctx.lineTo(w / 2, 0); ctx.lineTo(0, h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(w, 0); ctx.lineTo(w / 2, 0); ctx.lineTo(w, h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = gooseColor;
+            ctx.beginPath();
+            ctx.moveTo(w / 2, 0); ctx.lineTo(0, h); ctx.lineTo(w, h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        /**
+         * Fills the canvas with a pattern, applying color animation.
+         */
+        let quiltLayout = [];
+
+        function generateQuiltLayout() {
+            quiltLayout = [];
+            const baseBlockHeight = 40;
+            const baseBlockWidth = baseBlockHeight * 2;
+            
+            const gridCols = Math.ceil(canvas.width / baseBlockWidth);
+            const gridRows = Math.ceil(canvas.height / baseBlockHeight);
+            const occupied = Array(gridRows).fill(0).map(() => Array(gridCols).fill(false));
+
+            const blockMultipliers = [1, 2]; // e.g., 1x1 or 2x2 the base block dimensions
+
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    if (occupied[row][col]) continue;
+
+                    // Filter for sizes that fit on the canvas and in unoccupied space
+                    let possibleMultipliers = blockMultipliers.filter(m => {
+                        if (row + m > gridRows || col + m > gridCols) return false;
+                        for (let r = 0; r < m; r++) {
+                            for (let c = 0; c < m; c++) {
+                                if (occupied[row + r][col + c]) return false;
+                            }
+                        }
+                        return true;
+                    }).reverse(); // Prefer larger blocks
+
+                    if (possibleMultipliers.length === 0) continue;
+                    
+                    const multiplier = possibleMultipliers[Math.floor(Math.random() * possibleMultipliers.length)];
+                    const blockWidth = multiplier * baseBlockWidth;
+                    const blockHeight = multiplier * baseBlockHeight;
+
+                    for (let r = 0; r < multiplier; r++) {
+                        for (let c = 0; c < multiplier; c++) {
+                            occupied[row + r][col + c] = true;
+                        }
+                    }
+
+                    const x = col * baseBlockWidth;
+                    const y = row * baseBlockHeight;
+                    const baseColorIndex1 = (col + row) % colors.length;
+                    const baseColorIndex2 = (baseColorIndex1 + 2) % colors.length;
+
+                    quiltLayout.push({ x, y, blockWidth, blockHeight, baseColorIndex1, baseColorIndex2 });
+                }
+            }
+        }
+
+        /**
+         * Fills the canvas with a pattern, applying color animation.
+         */
+        function drawPattern(cycleShift, cycleProgress) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (const block of quiltLayout) {
+                const { x, y, blockWidth, blockHeight, baseColorIndex1, baseColorIndex2 } = block;
+
+                const fromGooseIndex = (baseColorIndex1 + cycleShift) % colors.length;
+                const toGooseIndex = (fromGooseIndex + 1) % colors.length;
+                const gooseColor = lerpColor(colors[fromGooseIndex], colors[toGooseIndex], cycleProgress);
+
+                const fromSkyIndex = (baseColorIndex2 + cycleShift) % colors.length;
+                const toSkyIndex = (fromSkyIndex + 1) % colors.length;
+                const skyColor = lerpColor(colors[fromSkyIndex], colors[toSkyIndex], cycleProgress);
+
+                const orientation = 'up';
+                drawFlyingGeeseUnit(x, y, blockWidth, blockHeight, gooseColor, skyColor, orientation);
+            }
+        }
+
+        let animationState = { shift: 0, progress: 0 };
+
+        function animate(time) {
+            if (time === undefined) time = 0;
+            const timeOffset = (time / transitionDuration);
+            animationState.shift = Math.floor(timeOffset);
+            animationState.progress = timeOffset - animationState.shift;
+
+            drawPattern(animationState.shift, animationState.progress);
+            requestAnimationFrame(animate);
+        }
+
+        function setupCanvasAndQuilt() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            generateQuiltLayout();
+            drawPattern(animationState.shift, animationState.progress);
+        }
+
+        window.addEventListener('resize', setupCanvasAndQuilt);
+
+        window.onload = () => {
+            setupCanvasAndQuilt();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

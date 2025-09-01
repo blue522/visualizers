@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flying Geese Quilt</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="quiltCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('quiltCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // A color palette for the quilt blocks
+        const colors = ['#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'];
+
+        /**
+         * Draws a single "Flying Geese" block.
+         * A block is a rectangle composed of three triangles: a large "goose" and two smaller "sky" triangles.
+         * @param {number} x - The x-coordinate of the top-left corner of the block.
+         * @param {number} y - The y-coordinate of the top-left corner of the block.
+         * @param {number} width - The width of the block.
+         * @param {number} height - The height of the block.
+         * @param {string} gooseColor - The color of the main "goose" triangle.
+         * @param {string} skyColor - The color of the two "sky" triangles.
+         * @param {string} orientation - The direction the "goose" is flying ('up', 'down', 'left', 'right').
+         */
+        function drawFlyingGeeseUnit(x, y, width, height, gooseColor, skyColor, orientation) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            let w = width;
+            let h = height;
+
+            // Rotate the canvas context to handle the orientation
+            switch (orientation) {
+                case 'up':
+                    // Default orientation, no rotation needed.
+                    break;
+                case 'right':
+                    // Rotate 90 degrees clockwise and adjust position
+                    ctx.rotate(Math.PI / 2);
+                    ctx.translate(0, -width);
+                    [w, h] = [height, width]; // Swap dimensions for drawing logic
+                    break;
+                case 'down':
+                    // Rotate 180 degrees and adjust position
+                    ctx.rotate(Math.PI);
+                    ctx.translate(-width, -height);
+                    break;
+                case 'left':
+                    // Rotate 90 degrees counter-clockwise and adjust position
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.translate(-height, 0);
+                    [w, h] = [height, width]; // Swap dimensions for drawing logic
+                    break;
+            }
+
+            // Draw the two "sky" triangles that form the background
+            ctx.fillStyle = skyColor;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);      // Top-left corner
+            ctx.lineTo(w / 2, 0);  // Top-center
+            ctx.lineTo(0, h);      // Bottom-left corner
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(w, 0);      // Top-right corner
+            ctx.lineTo(w / 2, 0);  // Top-center
+            ctx.lineTo(w, h);      // Bottom-right corner
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw the main "goose" triangle
+            ctx.fillStyle = gooseColor;
+            ctx.beginPath();
+            ctx.moveTo(w / 2, 0);  // Top-center
+            ctx.lineTo(0, h);      // Bottom-left corner
+            ctx.lineTo(w, h);      // Bottom-right corner
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        /**
+         * Fills the canvas with a repeating pattern of Flying Geese blocks.
+         */
+        function drawPattern() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const blockHeight = 40;
+            const blockWidth = blockHeight * 2; // Standard Flying Geese are a 2:1 rectangle
+
+            // Loop over the canvas in a grid
+            for (let y = 0; y < canvas.height; y += blockHeight) {
+                for (let x = 0; x < canvas.width; x += blockWidth) {
+                    
+                    // Create a deterministic color pattern based on block position
+                    const colorIndex1 = (Math.floor(x / blockWidth) + Math.floor(y / blockHeight)) % colors.length;
+                    const colorIndex2 = (colorIndex1 + 2) % colors.length; // Use a different offset for more contrast
+                    const gooseColor = colors[colorIndex1];
+                    const skyColor = colors[colorIndex2];
+
+                    // For this pattern, we'll have all geese flying up to create a simple, classic look.
+                    const orientation = 'up';
+                    
+                    drawFlyingGeeseUnit(x, y, blockWidth, blockHeight, gooseColor, skyColor, orientation);
+                }
+            }
+        }
+
+        // Redraw the pattern when the window is resized
+        window.addEventListener('resize', drawPattern);
+
+        // Initial draw
+        drawPattern();
+    </script>
+</body>
+</html>

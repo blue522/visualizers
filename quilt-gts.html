@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log Cabin Quilt</title>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000; 
+            color: #fff;
+            font-family: sans-serif;
+        }
+        canvas { 
+            display: block; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        #toggleControlsBtn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            z-index: 1000;
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        .controls.hidden {
+            transform: translate(-50%, -150%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .controls label {
+            font-weight: bold;
+        }
+        .controls input {
+            width: 50px;
+        }
+        .controls input[type="range"] {
+            width: 80px;
+        }
+        .controls button {
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: none;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        .controls input[type="color"] {
+            padding: 0;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button id="toggleControlsBtn">🎨</button>
+    <div class="controls hidden">
+        <label for="numX">Blocks Wide:</label>
+        <input type="number" id="numX" value="10">
+        <label for="numY">Blocks High:</label>
+        <input type="number" id="numY" value="6">
+        <label for="baseColor">Base Color:</label>
+        <input type="color" id="baseColor" value="#e5989b">
+        <label for="speed">Speed:</label>
+        <input type="range" id="speed" min="0" max="5" value="1" step="0.1">
+        <button id="generateBtn">Generate Quilt</button>
+    </div>
+
+    <canvas id="quiltCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('quiltCanvas');
+        const ctx = canvas.getContext('2d');
+        const generateBtn = document.getElementById('generateBtn');
+        const numXInput = document.getElementById('numX');
+        const numYInput = document.getElementById('numY');
+        const colorInput = document.getElementById('baseColor');
+        const speedInput = document.getElementById('speed');
+        const controlsPanel = document.querySelector('.controls');
+        const toggleBtn = document.getElementById('toggleControlsBtn');
+
+        // --- Lettering Data ---
+        const letterMap = {
+            'G': [
+                [0,1,1,1,0],
+                [1,0,0,0,0],
+                [1,0,1,1,1],
+                [1,0,0,0,1],
+                [0,1,1,1,0]
+            ],
+            'H': [
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [1,1,1,1,1],
+                [1,0,0,0,1],
+                [1,0,0,0,1]
+            ],
+            'O': [
+                [0,1,1,1,0],
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [0,1,1,1,0]
+            ],
+            'S': [
+                [1,1,1,1,0],
+                [1,0,0,0,0],
+                [0,1,1,1,0],
+                [0,0,0,0,1],
+                [0,1,1,1,1]
+            ],
+            'T': [
+                [1,1,1,1,1],
+                [0,0,1,0,0],
+                [0,0,1,0,0],
+                [0,0,1,0,0],
+                [0,0,1,0,0]
+            ],
+            'W': [
+                [1,0,0,0,1],
+                [1,0,1,0,1],
+                [1,0,1,0,1],
+                [1,0,1,0,1],
+                [0,1,0,1,0]
+            ],
+            'N': [
+                [1,0,0,0,1],
+                [1,1,0,0,1],
+                [1,0,1,0,1],
+                [1,0,0,1,1],
+                [1,0,0,0,1]
+            ],
+            'U': [
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [1,0,0,0,1],
+                [0,1,1,1,0]
+            ]
+        };
+
+        let basePalette = [];
+        let quiltData = [];
+        let animationFrameId = null;
+        let startTime = 0;
+
+        toggleBtn.addEventListener('click', () => {
+            controlsPanel.classList.toggle('hidden');
+        });
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            generateQuilt();
+        });
+        resizeCanvas();
+
+        // --- Color Conversion and Palette Generation ---
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        }
+
+        function rgbToHsl(r, g, b) {
+            r /= 255, g /= 255, b /= 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            if (max == min) {
+                h = s = 0;
+            } else {
+                let d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return [h, s, l];
+        }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s == 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1 / 6) return p + (q - p) * 6 * t;
+                    if (t < 1 / 2) return q;
+                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                    return p;
+                };
+                let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                let p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).padStart(6, '0');
+        }
+
+        function generateColorPalette(baseHex, count = 12) {
+            const rgb = hexToRgb(baseHex);
+            if (!rgb) return [];
+            const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
+            
+            const palette = [{h, s, l}];
+            for (let i = 0; i < count - 1; i++) {
+                const newH = (h + (Math.random() - 0.5) * 0.2 + 1) % 1;
+                const newS = Math.max(0.2, Math.min(1, s + (Math.random() - 0.5) * 0.5));
+                const newL = Math.max(0.1, Math.min(0.95, l + (Math.random() - 0.5) * 0.6));
+                palette.push({h: newH, s: newS, l: newL});
+            }
+            return palette;
+        }
+        
+        function createLogCabinBlockData(startX, startY, size, paletteSize, isText = false) {
+            const blockPieces = [];
+            let x = startX;
+            let y = startY;
+            let logWidth = size / 8;
+            
+            let centerX = x + 3 * logWidth;
+            let centerY = y + 3 * logWidth;
+            
+            const addPiece = (px, py, pw, ph) => {
+                let colorIndex;
+                if (isText) {
+                    colorIndex = 0; // Use the first color of the palette for text
+                } else {
+                    // Use a random color from the rest of the palette for background
+                    colorIndex = 1 + Math.floor(Math.random() * (paletteSize - 1));
+                }
+                blockPieces.push({ x: px, y: py, w: pw, h: ph, colorIndex });
+            };
+
+            addPiece(centerX, centerY, 2 * logWidth, 2 * logWidth);
+
+            let currentSize = 2 * logWidth;
+            for (let i = 0; i < 3; i++) {
+                addPiece(centerX + currentSize, centerY, logWidth, currentSize);
+                addPiece(centerX, centerY + currentSize, currentSize + logWidth, logWidth);
+                
+                currentSize += logWidth;
+                centerX -= logWidth;
+                addPiece(centerX, centerY, logWidth, currentSize);
+
+                centerY -= logWidth;
+                addPiece(centerX, centerY, currentSize + logWidth, logWidth);
+                currentSize += logWidth;
+            }
+            return blockPieces;
+        }
+
+        function drawQuilt(animatedPalette) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const piece of quiltData) {
+                ctx.fillStyle = animatedPalette[piece.colorIndex];
+                ctx.fillRect(piece.x, piece.y, piece.w, piece.h);
+            }
+        }
+
+        function animate() {
+            const speed = parseFloat(speedInput.value);
+            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+            const hueShift = elapsedTime * (speed / 100);
+
+            const animatedPalette = basePalette.map(hslColor => {
+                const newH = (hslColor.h + hueShift) % 1;
+                const [r, g, b] = hslToRgb(newH, hslColor.s, hslColor.l);
+                return rgbToHex(r, g, b);
+            });
+
+            drawQuilt(animatedPalette);
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function generateQuilt() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            
+            const numX = parseInt(numXInput.value, 10);
+            const numY = parseInt(numYInput.value, 10);
+
+            // --- Text Rendering Logic ---
+            const lines = ["GHOST", "TOWN", "SONGS"];
+            const charHeight = 5;
+            const charWidth = 5;
+            const lineSpacing = 2;
+            const charSpacing = 1;
+
+            const textHeightInBlocks = (lines.length * charHeight) + ((lines.length - 1) * lineSpacing);
+            const textWidthInBlocks = Math.max(...lines.map(line => (line.length * charWidth) + ((line.length - 1) * charSpacing)));
+
+            let textBlockGrid = Array(numY).fill(0).map(() => Array(numX).fill(false));
+            const canRenderText = numX >= textWidthInBlocks && numY >= textHeightInBlocks;
+
+            if (canRenderText) {
+                const startY = Math.floor((numY - textHeightInBlocks) / 2);
+                let currentY = startY;
+
+                for (const line of lines) {
+                    const lineWidth = (line.length * charWidth) + ((line.length - 1) * charSpacing);
+                    const startX = Math.floor((numX - lineWidth) / 2);
+                    let currentX = startX;
+
+                    for (const char of line) {
+                        if (letterMap[char]) {
+                            const matrix = letterMap[char];
+                            for (let y = 0; y < charHeight; y++) {
+                                for (let x = 0; x < charWidth; x++) {
+                                    if (matrix[y][x] === 1) {
+                                        if ((currentY + y < numY) && (currentX + x < numX)) {
+                                            textBlockGrid[currentY + y][currentX + x] = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        currentX += charWidth + charSpacing;
+                    }
+                    currentY += charHeight + lineSpacing;
+                }
+            }
+            // --- End Text Logic ---
+
+            basePalette = generateColorPalette(colorInput.value);
+            quiltData = [];
+
+            const blockWidth = canvas.width / numX;
+            const blockHeight = canvas.height / numY;
+            const blockSize = Math.min(blockWidth, blockHeight);
+
+            const totalQuiltWidth = numX * blockSize;
+            const totalQuiltHeight = numY * blockSize;
+            const quiltStartX = (canvas.width - totalQuiltWidth) / 2;
+            const quiltStartY = (canvas.height - totalQuiltHeight) / 2;
+
+            for (let i = 0; i < numX; i++) {
+                for (let j = 0; j < numY; j++) {
+                    const isText = textBlockGrid[j][i];
+                    const blockPieces = createLogCabinBlockData(
+                        quiltStartX + i * blockSize, 
+                        quiltStartY + j * blockSize, 
+                        blockSize, 
+                        basePalette.length, 
+                        isText
+                    );
+                    quiltData.push(...blockPieces);
+                }
+            }
+            
+            startTime = Date.now();
+            animate();
+        }
+
+        generateBtn.addEventListener('click', generateQuilt);
+        
+        generateQuilt();
+
+    </script>
+</body>
+</html>
