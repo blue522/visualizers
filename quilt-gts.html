@@ -83,29 +83,31 @@
 </head>
 <body>
     <button id="toggleControlsBtn">🎨</button>
-    <div class="controls hidden">
-        <label for="numX">Blocks Wide:</label>
-        <input type="number" id="numX" value="10">
-        <label for="numY">Blocks High:</label>
-        <input type="number" id="numY" value="6">
-        <label for="baseColor">Base Color:</label>
-        <input type="color" id="baseColor" value="#e5989b">
-        <label for="speed">Speed:</label>
-        <input type="range" id="speed" min="0" max="5" value="1" step="0.1">
-        <button id="generateBtn">Generate Quilt</button>
-    </div>
-
-    <canvas id="quiltCanvas"></canvas>
+        <div class="controls hidden">
+            <label for="numX">Blocks Wide:</label>
+            <input type="range" id="numX" min="1" max="100" value="29">
+            <span id="numXValue" style="width: 25px; text-align: right;">29</span>
+            <label for="baseColor">Base Color:</label>
+            <input type="color" id="baseColor" value="#e5989b">
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="0" max="5" value="1" step="0.1">
+            <button id="generateBtn">Generate Quilt</button>
+        </div>    <canvas id="quiltCanvas"></canvas>
     <script>
         const canvas = document.getElementById('quiltCanvas');
         const ctx = canvas.getContext('2d');
         const generateBtn = document.getElementById('generateBtn');
         const numXInput = document.getElementById('numX');
-        const numYInput = document.getElementById('numY');
+        const numXValue = document.getElementById('numXValue');
         const colorInput = document.getElementById('baseColor');
         const speedInput = document.getElementById('speed');
         const controlsPanel = document.querySelector('.controls');
         const toggleBtn = document.getElementById('toggleControlsBtn');
+
+        numXInput.addEventListener('input', () => {
+            numXValue.textContent = numXInput.value;
+        });
+        numXInput.addEventListener('change', generateQuilt);
 
         // --- Lettering Data ---
         const letterMap = {
@@ -254,12 +256,10 @@
         
         function createLogCabinBlockData(startX, startY, size, paletteSize, isText = false) {
             const blockPieces = [];
-            let x = startX;
-            let y = startY;
             let logWidth = size / 8;
             
-            let centerX = x + 3 * logWidth;
-            let centerY = y + 3 * logWidth;
+            let centerX = startX + 3 * logWidth;
+            let centerY = startY + 3 * logWidth;
             
             const addPiece = (px, py, pw, ph) => {
                 let colorIndex;
@@ -319,7 +319,8 @@
             }
             
             const numX = parseInt(numXInput.value, 10);
-            const numY = parseInt(numYInput.value, 10);
+            const blockSize = canvas.width / numX;
+            const numY = Math.ceil(canvas.height / blockSize);
 
             // --- Text Rendering Logic ---
             const lines = ["GHOST", "TOWN", "SONGS"];
@@ -366,21 +367,12 @@
             basePalette = generateColorPalette(colorInput.value);
             quiltData = [];
 
-            const blockWidth = canvas.width / numX;
-            const blockHeight = canvas.height / numY;
-            const blockSize = Math.min(blockWidth, blockHeight);
-
-            const totalQuiltWidth = numX * blockSize;
-            const totalQuiltHeight = numY * blockSize;
-            const quiltStartX = (canvas.width - totalQuiltWidth) / 2;
-            const quiltStartY = (canvas.height - totalQuiltHeight) / 2;
-
             for (let i = 0; i < numX; i++) {
                 for (let j = 0; j < numY; j++) {
-                    const isText = textBlockGrid[j][i];
+                    const isText = textBlockGrid[j] && textBlockGrid[j][i];
                     const blockPieces = createLogCabinBlockData(
-                        quiltStartX + i * blockSize, 
-                        quiltStartY + j * blockSize, 
+                        i * blockSize, 
+                        j * blockSize, 
                         blockSize, 
                         basePalette.length, 
                         isText
@@ -394,6 +386,7 @@
         }
 
         generateBtn.addEventListener('click', generateQuilt);
+        colorInput.addEventListener('change', generateQuilt);
         
         generateQuilt();
 
