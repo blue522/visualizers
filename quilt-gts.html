@@ -92,7 +92,11 @@
             <label for="speed">Speed:</label>
             <input type="range" id="speed" min="0" max="5" value="1" step="0.1">
             <button id="generateBtn">Generate Quilt</button>
-        </div>    <canvas id="quiltCanvas"></canvas>
+        </div>
+
+    <img id="sourceImage" src="img/1.png" style="display: none;">
+    <img id="sourceImage2" src="img/2.png" style="display: none;">
+    <canvas id="quiltCanvas"></canvas>
     <script>
         const canvas = document.getElementById('quiltCanvas');
         const ctx = canvas.getContext('2d');
@@ -103,6 +107,8 @@
         const speedInput = document.getElementById('speed');
         const controlsPanel = document.querySelector('.controls');
         const toggleBtn = document.getElementById('toggleControlsBtn');
+        const sourceImage = document.getElementById('sourceImage');
+        const sourceImage2 = document.getElementById('sourceImage2');
 
         numXInput.addEventListener('input', () => {
             numXValue.textContent = numXInput.value;
@@ -261,30 +267,48 @@
             let centerX = startX + 3 * logWidth;
             let centerY = startY + 3 * logWidth;
             
+            let pieceCounter = 0;
             const addPiece = (px, py, pw, ph) => {
-                let colorIndex;
-                if (isText) {
-                    colorIndex = 0; // Use the first color of the palette for text
-                } else {
-                    // Use a random color from the rest of the palette for background
-                    colorIndex = 1 + Math.floor(Math.random() * (paletteSize - 1));
+                const sourceW = 50; // Define a fixed size for the snippet
+                const sourceH = 50;
+
+                // The 2nd piece added (index 1) is the east side of the first ring
+                if (pieceCounter === 1 && sourceImage2.complete && sourceImage2.naturalWidth > 0) {
+                    const sourceX = Math.random() * (sourceImage2.naturalWidth - sourceW);
+                    const sourceY = Math.random() * (sourceImage2.naturalHeight - sourceH);
+                    blockPieces.push({ x: px, y: py, w: pw, h: ph, isImagePiece: true, image: sourceImage2, sx: sourceX, sy: sourceY, sw: sourceW, sh: sourceH });
                 }
-                blockPieces.push({ x: px, y: py, w: pw, h: ph, colorIndex });
+                // The 7th piece added (index 6) is the south side of the second ring
+                else if (pieceCounter === 6 && sourceImage.complete && sourceImage.naturalWidth > 0) {
+                    const sourceX = Math.random() * (sourceImage.naturalWidth - sourceW);
+                    const sourceY = Math.random() * (sourceImage.naturalHeight - sourceH);
+                    blockPieces.push({ x: px, y: py, w: pw, h: ph, isImagePiece: true, image: sourceImage, sx: sourceX, sy: sourceY, sw: sourceW, sh: sourceH });
+                } else {
+                    let colorIndex;
+                    if (isText) {
+                        colorIndex = 0; // Use the first color of the palette for text
+                    } else {
+                        // Use a random color from the rest of the palette for background
+                        colorIndex = 1 + Math.floor(Math.random() * (paletteSize - 1));
+                    }
+                    blockPieces.push({ x: px, y: py, w: pw, h: ph, colorIndex, isImagePiece: false });
+                }
+                pieceCounter++;
             };
 
-            addPiece(centerX, centerY, 2 * logWidth, 2 * logWidth);
+            addPiece(centerX, centerY, 2 * logWidth, 2 * logWidth); // Hearth
 
             let currentSize = 2 * logWidth;
             for (let i = 0; i < 3; i++) {
-                addPiece(centerX + currentSize, centerY, logWidth, currentSize);
-                addPiece(centerX, centerY + currentSize, currentSize + logWidth, logWidth);
+                addPiece(centerX + currentSize, centerY, logWidth, currentSize); // East
+                addPiece(centerX, centerY + currentSize, currentSize + logWidth, logWidth); // South
                 
                 currentSize += logWidth;
                 centerX -= logWidth;
-                addPiece(centerX, centerY, logWidth, currentSize);
+                addPiece(centerX, centerY, logWidth, currentSize); // West
 
                 centerY -= logWidth;
-                addPiece(centerX, centerY, currentSize + logWidth, logWidth);
+                addPiece(centerX, centerY, currentSize + logWidth, logWidth); // North
                 currentSize += logWidth;
             }
             return blockPieces;
@@ -293,8 +317,12 @@
         function drawQuilt(animatedPalette) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (const piece of quiltData) {
-                ctx.fillStyle = animatedPalette[piece.colorIndex];
-                ctx.fillRect(piece.x, piece.y, piece.w, piece.h);
+                if (piece.isImagePiece) {
+                    ctx.drawImage(piece.image, piece.sx, piece.sy, piece.sw, piece.sh, piece.x, piece.y, piece.w, piece.h);
+                } else {
+                    ctx.fillStyle = animatedPalette[piece.colorIndex];
+                    ctx.fillRect(piece.x, piece.y, piece.w, piece.h);
+                }
             }
         }
 
@@ -388,7 +416,24 @@
         generateBtn.addEventListener('click', generateQuilt);
         colorInput.addEventListener('change', generateQuilt);
         
-        generateQuilt();
+        const images = [sourceImage, sourceImage2];
+        let loadedImages = 0;
+        const onImageLoad = () => {
+            loadedImages++;
+            if (loadedImages === images.length) {
+                console.log('All source images loaded.');
+                generateQuilt();
+            }
+        };
+
+        images.forEach(img => {
+            if (img.complete) {
+                onImageLoad();
+            } else {
+                img.onload = onImageLoad;
+                img.onerror = () => console.error(`Failed to load image: ${img.src}`);
+            }
+        });
 
     </script>
 </body>
