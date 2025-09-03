@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <!-- Page title -->
     <title>Log Cabin Quilt</title>
 
-    <!--video credit: Video by <a href="https://pixabay.com/users/missdeena-18652712/?utm_source=link-attribution&utm_medium=referral&utm_campaign=video&utm_content=65562">Miss Deena</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=video&utm_content=65562">Pixabay</a>-->
-    <!--music credit: Music by <a href="https://pixabay.com/users/sergepavkinmusic-6130722/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=115977">Sergii Pavkin</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=115977">Pixabay</a>-->
+    <!-- Video and music credits (Pixabay) -->
+    <!-- video credit: Video by <a href="https://pixabay.com/users/missdeena-18652712/?utm_source=link-attribution&utm_medium=referral&utm_campaign=video&utm_content=65562">Miss Deena</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=video&utm_content=65562">Pixabay</a> -->
+    <!-- music credit: Music by <a href="https://pixabay.com/users/sergepavkinmusic-6130722/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=115977">Sergii Pavkin</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=115977">Pixabay</a> -->
     <meta charset="UTF-8">
     <style>
         body { 
@@ -13,6 +15,7 @@
             background-color: #000; 
             color: #fff;
             font-family: sans-serif;
+            /* Basic body styles: no margin, hidden overflow, background color, text color, and font */
         }
         #video-bg {
             position: fixed;
@@ -22,6 +25,7 @@
             height: 100%;
             object-fit: cover;
             z-index: -2;
+            /* Style for the background video: fixed position, full coverage, behind the canvas */
         }
         #video-fg {
             position: fixed;
@@ -32,15 +36,18 @@
             object-fit: cover;
             z-index: 3;
             opacity: 0.1;
+            /* Style for the foreground video: fixed position, full coverage, above the canvas, with transparency */
         }
         canvas { 
             display: block; 
             position: absolute;
             top: 0;
             left: 0;
+            /* Canvas style: block display, absolute position, behind the videos */
             z-index: -1;
         }
         #toggleControlsBtn {
+            /* Style for the toggle controls button */
             position: fixed;
             top: 15px;
             left: 15px;
@@ -58,6 +65,7 @@
             align-items: center;
         }
         .controls {
+            /* Style for the controls panel */
             position: fixed;
             top: 20px;
             left: 50%;
@@ -71,6 +79,7 @@
             z-index: 1000;
             transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
         }
+        /* Style for hidden controls */
         .controls.hidden {
             transform: translate(-50%, -150%);
             opacity: 0;
@@ -85,6 +94,7 @@
         .controls input[type="range"] {
             width: 80px;
         }
+        /* Style for the button */
         .controls button {
             padding: 8px 15px;
             border-radius: 5px;
@@ -93,6 +103,7 @@
             color: white;
             cursor: pointer;
         }
+        /* Style for the color input */
         .controls input[type="color"] {
             padding: 0;
             border: none;
@@ -104,8 +115,10 @@
     </style>
 </head>
 <body>
+    <!-- Button to toggle the visibility of the controls panel -->
     <button id="toggleControlsBtn">🎨</button>
         <div class="controls hidden">
+            <!-- Controls panel for adjusting quilt parameters -->
             <label for="numX">Blocks Wide:</label>
             <input type="range" id="numX" min="1" max="50" value="2">
             <span id="numXValue" style="width: 25px; text-align: right;">2</span>
@@ -116,25 +129,33 @@
             <button id="generateBtn">Generate Quilt</button>
         </div>
 
+    <!-- Background video element -->
     <video id="video-bg" loop muted playsinline autoplay src="assets/water.mp4"></video>
+    <!-- Hidden image elements used as textures -->
     <img id="sourceImage" src="assets/1.png" style="display: none;">
     <img id="sourceImage2" src="assets/2.png" style="display: none;">
+    <!-- Canvas element for rendering the quilt -->
     <canvas id="quiltCanvas"></canvas>
     <script>
+        // --- DOM Element References ---
         const canvas = document.getElementById('quiltCanvas');
         const ctx = canvas.getContext('2d');
         const generateBtn = document.getElementById('generateBtn');
         const numXInput = document.getElementById('numX');
         const numXValue = document.getElementById('numXValue');
         const colorInput = document.getElementById('baseColor');
+
         const speedInput = document.getElementById('speed');
         const controlsPanel = document.querySelector('.controls');
         const toggleBtn = document.getElementById('toggleControlsBtn');
         const sourceImage = document.getElementById('sourceImage');
         const sourceImage2 = document.getElementById('sourceImage2');
+
         const video = document.getElementById('video-bg');
 
+        // --- Event Listeners for User Input ---
         numXInput.addEventListener('input', () => {
+            // Update the displayed value for the number of blocks wide
             numXValue.textContent = numXInput.value;
         });
         numXInput.addEventListener('change', generateQuilt);
@@ -204,6 +225,7 @@
         let animationFrameId = null;
         let startTime = 0;
 
+        // --- UI Interaction ---
         toggleBtn.addEventListener('click', () => {
             controlsPanel.classList.toggle('hidden');
         });
@@ -212,6 +234,7 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
+
         window.addEventListener('resize', () => {
             resizeCanvas();
             generateQuilt();
@@ -220,6 +243,7 @@
 
         // --- Color Conversion and Palette Generation ---
         function hexToRgb(hex) {
+            // Convert hex color to RGB
             let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
             return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
         }
@@ -244,6 +268,7 @@
         }
 
         function hslToRgb(h, s, l) {
+            // Convert HSL color to RGB
             let r, g, b;
             if (s == 0) {
                 r = g = b = l;
@@ -266,10 +291,12 @@
         }
 
         function rgbToHex(r, g, b) {
+            // Convert RGB color to hex
             return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).padStart(6, '0');
         }
 
         function generateColorPalette(baseHex, count = 12) {
+            // Generate a color palette based on a base hex color
             const rgb = hexToRgb(baseHex);
             if (!rgb) return [];
             const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -284,6 +311,7 @@
             return palette;
         }
         
+        // --- Quilt Block Creation ---
         function createLogCabinBlockData(startX, startY, size, paletteSize, isText = false) {
             const blockPieces = [];
             let logWidth = size / 8;
@@ -344,6 +372,7 @@
             return blockPieces;
         }
 
+        // --- Canvas Drawing ---
         function drawQuilt(animatedPalette) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (const piece of quiltData) {
@@ -356,6 +385,7 @@
             }
         }
 
+        // --- Animation ---
         function animate() {
             const speed = parseFloat(speedInput.value);
             const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
@@ -371,6 +401,7 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
+        // --- Quilt Generation ---
         function generateQuilt() {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
@@ -443,6 +474,7 @@
             animate();
         }
 
+        // --- Event Listeners for Quilt Generation ---
         generateBtn.addEventListener('click', generateQuilt);
         colorInput.addEventListener('change', generateQuilt);
         
@@ -475,5 +507,6 @@
 
     </script>
     <video id="video-fg" loop muted playsinline autoplay src="assets/water.mp4"></video>
+    <!-- Foreground video element -->
 </body>
 </html>
